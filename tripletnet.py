@@ -79,12 +79,15 @@ class Tripletnet(nn.Module):
         """
         # conditions only available on the anchor sample
         c = x.conditions
+        x_images = torch.permute(x.images, (0, 2, 3, 1))
+        y_images = torch.permute(y.images, (0, 2, 3, 1))
+        z_images = torch.permute(z.images, (0, 2, 3, 1))
         embedded_x, masknorm_norm_x, embed_norm_x, general_x = self.embeddingnet(
-            x.images, c)
+            x_images, c)
         embedded_y, masknorm_norm_y, embed_norm_y, general_y = self.embeddingnet(
-            y.images, c)
+            y_images, c)
         embedded_z, masknorm_norm_z, embed_norm_z, general_z = self.embeddingnet(
-            z.images, c)
+            z_images, c)
         mask_norm = (masknorm_norm_x + masknorm_norm_y + masknorm_norm_z) / 3
         embed_norm = (embed_norm_x + embed_norm_y + embed_norm_z) / 3
         loss_embed = embed_norm / np.sqrt(len(x))

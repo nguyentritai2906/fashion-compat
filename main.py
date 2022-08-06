@@ -190,7 +190,10 @@ def main():
                                               shuffle=False,
                                               **kwargs)
 
-    model = Resnet_18.resnet18(pretrained=True, embedding_size=args.dim_embed)
+    # model = Resnet_18.resnet18(pretrained=True, embedding_size=args.dim_embed)
+    model = torch.load('encoder.pt')
+    for param in model.parameters():
+        param.requires_grad = False
     csn_model = TypeSpecificNet(args, model,
                                 len(test_loader.dataset.typespaces))
 
@@ -344,6 +347,7 @@ def test(test_loader, tnet):
 
     # for test/val data we get images only from the data loader
     for batch_idx, images in enumerate(test_loader):
+        images = torch.permute(images, (0, 2, 3, 1))
         if args.cuda:
             images = images.cuda()
         images = Variable(images)
