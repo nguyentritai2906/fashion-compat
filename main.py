@@ -6,16 +6,12 @@ import os
 import shutil
 import sys
 
-import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 from torchvision import transforms
 
-import Resnet_18
 from polyvore_outfits import TripletImageLoader
 from tripletnet import Tripletnet
 from type_specific_network import TypeSpecificNet
@@ -181,8 +177,8 @@ def main():
         'test',
         meta_data,
         transform=transforms.Compose([
-            transforms.Resize(112),
-            transforms.CenterCrop(112),
+            transforms.Resize(256),
+            transforms.CenterCrop(256),
             transforms.ToTensor(),
             normalize,
         ])),
@@ -190,12 +186,15 @@ def main():
                                               shuffle=False,
                                               **kwargs)
 
-    model = Resnet_18.resnet18(pretrained=True, embedding_size=args.dim_embed)
+    # model = Resnet_18.resnet18(pretrained=True, embedding_size=args.dim_embed)
+    model = torch.load('encoder.pt')
+    for param in model.parameters():
+        param.requires_grad = False
     csn_model = TypeSpecificNet(args, model,
                                 len(test_loader.dataset.typespaces))
-
     criterion = torch.nn.MarginRankingLoss(margin=args.margin)
-    tnet = Tripletnet(args, csn_model, text_feature_dim, criterion)
+    tnet = Tripletnet(args, csn_model, criterion)
+
     if args.cuda:
         tnet.cuda()
 
@@ -205,8 +204,8 @@ def main():
         meta_data,
         text_dim=text_feature_dim,
         transform=transforms.Compose([
-            transforms.Resize(112),
-            transforms.CenterCrop(112),
+            transforms.Resize(256),
+            transforms.CenterCrop(256),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize,
@@ -219,8 +218,8 @@ def main():
         'valid',
         meta_data,
         transform=transforms.Compose([
-            transforms.Resize(112),
-            transforms.CenterCrop(112),
+            transforms.Resize(256),
+            transforms.CenterCrop(256),
             transforms.ToTensor(),
             normalize,
         ])),
@@ -290,24 +289,13 @@ def train(train_loader, tnet, criterion, optimizer, epoch):
         far = TrainData(img3, desc3, has_text3)
 
         # compute output
-        acc, loss_triplet, loss_mask, loss_embed, loss_vse, loss_sim_t, loss_sim_i = tnet(
+        acc, loss_triplet, loss_mask, loss_embed, loss_sim_i = tnet(
             anchor, far, close)
-
-        # encorages similar text inputs (sim_t) and image inputs (sim_i) to
-        # embed close to each other, images operate on the general embedding
-        loss_sim = args.sim_t_loss * loss_sim_t + args.sim_i_loss * loss_sim_i
-
-        # cross-modal similarity regularizer on the general embedding
-        loss_vse_w = args.vse_loss * loss_vse
 
         # sparsity and l2 regularizer
         loss_reg = args.embed_loss * loss_embed + args.mask_loss * loss_mask
 
-        loss = loss_triplet + loss_reg
-        if args.vse_loss > 0:
-            loss += loss_vse_w
-        if args.sim_t_loss > 0 or args.sim_i_loss > 0:
-            loss += loss_sim
+        loss = loss_triplet + loss_reg + args.sim_i_loss * loss_sim_i
 
         num_items = len(anchor)
         # measure accuracy and record loss
@@ -344,6 +332,7 @@ def test(test_loader, tnet):
 
     # for test/val data we get images only from the data loader
     for batch_idx, images in enumerate(test_loader):
+        images = torch.permute(images, (0, 2, 3, 1))
         if args.cuda:
             images = images.cuda()
         images = Variable(images)

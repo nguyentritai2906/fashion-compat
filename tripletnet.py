@@ -57,10 +57,9 @@ class EmbedBranch(nn.Module):
 
 class Tripletnet(nn.Module):
 
-    def __init__(self, args, embeddingnet, text_dim, criterion):
+    def __init__(self, args, embeddingnet, criterion):
         super(Tripletnet, self).__init__()
         self.embeddingnet = embeddingnet
-        self.text_branch = EmbedBranch(text_dim, args.dim_embed)
         self.metric_branch = None
         if args.learned_metric:
             self.metric_branch = nn.Linear(args.dim_embed, 1, bias=False)
@@ -79,12 +78,15 @@ class Tripletnet(nn.Module):
         """
         # conditions only available on the anchor sample
         c = x.conditions
+        x_images = torch.permute(x.images, (0, 2, 3, 1))
+        y_images = torch.permute(y.images, (0, 2, 3, 1))
+        z_images = torch.permute(z.images, (0, 2, 3, 1))
         embedded_x, masknorm_norm_x, embed_norm_x, general_x = self.embeddingnet(
-            x.images, c)
+            x_images, c)
         embedded_y, masknorm_norm_y, embed_norm_y, general_y = self.embeddingnet(
-            y.images, c)
+            y_images, c)
         embedded_z, masknorm_norm_z, embed_norm_z, general_z = self.embeddingnet(
-            z.images, c)
+            z_images, c)
         mask_norm = (masknorm_norm_x + masknorm_norm_y + masknorm_norm_z) / 3
         embed_norm = (embed_norm_x + embed_norm_y + embed_norm_z) / 3
         loss_embed = embed_norm / np.sqrt(len(x))
@@ -115,25 +117,6 @@ class Tripletnet(nn.Module):
 
         return acc, loss_triplet, loss_sim_i, loss_mask, loss_embed, general_x, general_y, general_z
 
-    def text_forward(self, x, y, z):
-        """ x: Anchor data
-            y: Distant (negative) data
-            z: Close (positive) data
-        """
-        desc_x = self.text_branch(x.text)
-        desc_y = self.text_branch(y.text)
-        desc_z = self.text_branch(z.text)
-        distd_p = F.pairwise_distance(desc_y, desc_z, 2)
-        distd_n1 = F.pairwise_distance(desc_x, desc_y, 2)
-        distd_n2 = F.pairwise_distance(desc_x, desc_z, 2)
-        has_text = x.has_text * y.has_text * z.has_text
-        loss_sim_t1 = selective_margin_loss(distd_p, distd_n1, self.margin,
-                                            has_text)
-        loss_sim_t2 = selective_margin_loss(distd_p, distd_n2, self.margin,
-                                            has_text)
-        loss_sim_t = (loss_sim_t1 + loss_sim_t2) / 2.
-        return loss_sim_t, desc_x, desc_y, desc_z
-
     def calc_vse_loss(self, desc_x, general_x, general_y, general_z, has_text):
         """ Both y and z are assumed to be negatives because they are not from the same
             item as x
@@ -158,14 +141,5 @@ class Tripletnet(nn.Module):
             y: Distant (negative) data
             z: Close (positive) data
         """
-        acc, loss_triplet, loss_sim_i, loss_mask, loss_embed, general_x, general_y, general_z = self.image_forward(
-            x, y, z)
-        loss_sim_t, desc_x, desc_y, desc_z = self.text_forward(x, y, z)
-        loss_vse_x = self.calc_vse_loss(desc_x, general_x, general_y,
-                                        general_z, x.has_text)
-        loss_vse_y = self.calc_vse_loss(desc_y, general_y, general_x,
-                                        general_z, y.has_text)
-        loss_vse_z = self.calc_vse_loss(desc_z, general_z, general_x,
-                                        general_y, z.has_text)
-        loss_vse = (loss_vse_x + loss_vse_y + loss_vse_z) / 3.
-        return acc, loss_triplet, loss_mask, loss_embed, loss_vse, loss_sim_t, loss_sim_i
+        acc, loss_triplet, loss_sim_i, loss_mask, loss_embed, general_x, general_y, general_z = self.image_forward(x, y, z)
+        return acc, loss_triplet, loss_mask, loss_embed, loss_sim_i
