@@ -233,7 +233,7 @@ def main():
     if args.resume:
         if os.path.isfile(args.resume):
             print("=> loading checkpoint '{}'".format(args.resume))
-            checkpoint = torch.load(args.resume)
+            checkpoint = torch.load(args.resume, encoding='latin1')
             args.start_epoch = checkpoint['epoch']
             best_acc = checkpoint['best_prec1']
             tnet.load_state_dict(checkpoint['state_dict'])
@@ -270,7 +270,8 @@ def main():
                 'best_prec1': best_acc,
             }, is_best)
 
-    checkpoint = torch.load('runs/%s/' % (args.name) + 'model_best.pth.tar')
+    checkpoint = torch.load('runs/%s/' % (args.name) + 'model_best.pth.tar',
+                            encoding='latin1')
     tnet.load_state_dict(checkpoint['state_dict'])
     test_acc = test(test_loader, tnet)
 
