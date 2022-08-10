@@ -181,8 +181,8 @@ def main():
         'test',
         meta_data,
         transform=transforms.Compose([
-            transforms.Resize(112),
-            transforms.CenterCrop(112),
+            transforms.Resize(256),
+            transforms.CenterCrop(256),
             transforms.ToTensor(),
             normalize,
         ])),
@@ -208,8 +208,8 @@ def main():
         meta_data,
         text_dim=text_feature_dim,
         transform=transforms.Compose([
-            transforms.Resize(112),
-            transforms.CenterCrop(112),
+            transforms.Resize(256),
+            transforms.CenterCrop(256),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize,
@@ -222,8 +222,8 @@ def main():
         'valid',
         meta_data,
         transform=transforms.Compose([
-            transforms.Resize(112),
-            transforms.CenterCrop(112),
+            transforms.Resize(256),
+            transforms.CenterCrop(256),
             transforms.ToTensor(),
             normalize,
         ])),
