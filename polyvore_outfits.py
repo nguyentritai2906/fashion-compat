@@ -121,6 +121,7 @@ class TripletImageLoader(torch.utils.data.Dataset):
                                args.polyvore_split)
         self.impath = os.path.join(args.datadir, 'polyvore_outfits', 'images')
         self.is_train = split == 'train'
+        self.is_test = split == 'test'
         data_json = os.path.join(rootdir, '%s.json' % split)
         outfit_data = json.load(open(data_json, 'r'))
 
@@ -353,24 +354,35 @@ class TripletImageLoader(torch.utils.data.Dataset):
         acc = correct / n_questions
         return acc
 
-    def __getitem__(self, index):
-        if self.is_train:
-            outfit_id, anchor_im, pos_im = self.pos_pairs[index]
-            img1, desc1, has_text1, anchor_type = self.load_train_item(
-                anchor_im)
-            img2, desc2, has_text2, item_type = self.load_train_item(pos_im)
+    def _getitem_train(self, index):
+        outfit_id, anchor_im, pos_im = self.pos_pairs[index]
+        img1, desc1, has_text1, anchor_type = self.load_train_item(
+            anchor_im)
+        img2, desc2, has_text2, item_type = self.load_train_item(pos_im)
 
-            neg_im = self.sample_negative(outfit_id, pos_im, item_type)
-            img3, desc3, has_text3, _ = self.load_train_item(neg_im)
-            condition = self.get_typespace(anchor_type, item_type)
-            return img1, desc1, has_text1, img2, desc2, has_text2, img3, desc3, has_text3, condition
+        neg_im = self.sample_negative(outfit_id, pos_im, item_type)
+        img3, desc3, has_text3, _ = self.load_train_item(neg_im)
+        condition = self.get_typespace(anchor_type, item_type)
+        return img1, desc1, has_text1, img2, desc2, has_text2, img3, desc3, has_text3, condition
 
+    def _getitem_test(self, index):
         anchor = self.imnames[index]
         img1 = self.loader(os.path.join(self.impath, '%s.jpg' % anchor))
         if self.transform is not None:
             img1 = self.transform(img1)
+        item_type = self.im2type[anchor]
+        return img1, item_type, anchor, os.path.join(self.impath, '%s.jpg' % anchor)
 
-        return img1
+    def _getitem_demo(self, index):
+        return self.fitb_questions[index]
+
+    def __getitem__(self, index):
+        if self.is_train:
+            return self._getitem_train(index)
+        elif self.is_test:
+            return self._getitem_test(index)
+        else:
+            return self._getitem_demo(index)
 
     def shuffle(self):
         np.random.shuffle(self.pos_pairs)

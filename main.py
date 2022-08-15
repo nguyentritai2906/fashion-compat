@@ -347,7 +347,8 @@ def test(test_loader, tnet):
     embeddings = []
 
     # for test/val data we get images only from the data loader
-    for batch_idx, images in enumerate(test_loader):
+    for batch_idx, data in enumerate(test_loader):
+        images, _, _, _ = data
         images = torch.permute(images, (0, 2, 3, 1))
         if args.cuda:
             images = images.cuda()
